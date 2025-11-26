@@ -658,10 +658,11 @@ void deep_sleep(int us) {}
 #ifdef PIBOT_PENDANT
 int get_band_multiplier() {
     // Band switch pins have 10k pull-ups, LOW when switch grounds them
+    // Position 0 (no pins LOW): return 0 = jog locked
     if (digitalRead(GPIO_NUM_34) == LOW) return 1;    // Position 1: ×1
     if (digitalRead(GPIO_NUM_35) == LOW) return 10;   // Position 2: ×10
     if (digitalRead(GPIO_NUM_39) == LOW) return 100;  // Position 3: ×100
-    return 1;  // Default if no position detected
+    return 0;  // Off position: jog locked
 }
 #else
 int get_band_multiplier() {

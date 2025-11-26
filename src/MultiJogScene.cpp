@@ -65,12 +65,26 @@ public:
 #ifdef PIBOT_PENDANT
         // Display band switch multiplier
         int band = get_band_multiplier();
-        char band_str[8];
-        snprintf(band_str, sizeof(band_str), "x%d", band);
+        const char* band_str;
+        int color;
+        if (band == 0) {
+            band_str = "LOCK";
+            color = RED;
+        } else if (band == 1) {
+            band_str = "x1";
+            color = LIGHTGREY;
+        } else if (band == 10) {
+            band_str = "x10";
+            color = YELLOW;
+        } else {
+            band_str = "x100";
+            color = GREEN;
+        }
+        display.setFont(&fonts::FreeSansBold9pt7b);
         display.setTextDatum(top_right);
-        display.setTextColor(band == 1 ? LIGHTGREY : (band == 10 ? YELLOW : GREEN));
+        display.setTextColor(color, BLACK);  // Second param is background - prevents flicker
         display.drawString(band_str, 235, 5);
-        display.setTextDatum(top_left);  // Reset to default
+        display.setTextDatum(top_left);
 #endif
 
         if (state != Jog && _cancelling) {
@@ -310,53 +324,71 @@ public:
     }
 
     void start_mpg_jog(int delta) {
-        // e.g. $J=G91F1000X-10000
-        // Reduced speed to prevent buffer overflow (was F400/F10000)
         int band_mult = get_band_multiplier();
-        std::string cmd(inInches ? "$J=G91F100" : "$J=G91F2000");
+        if (band_mult == 0) return;  // Jog locked
+
+        // Band switch sets step size directly:
+        // x1 = 0.01mm, x10 = 0.1mm, x100 = 1.0mm per encoder click
+        // Feedrates kept conservative for Z axis (max 400 mm/min)
+        e4_t step_size;
+        int feedrate;
+        if (band_mult == 1) {
+            step_size = 100;      // Fine: 0.01mm
+            feedrate = 200;
+        } else if (band_mult == 10) {
+            step_size = 1000;     // Medium: 0.1mm
+            feedrate = 350;
+        } else {
+            step_size = 10000;    // Coarse: 1.0mm
+            feedrate = 350;       // Keep Z-safe
+        }
+
+        char cmd[64];
+        snprintf(cmd, sizeof(cmd), "$J=G91F%d", feedrate);
+        std::string cmdStr(cmd);
+
         for (int axis = 0; axis < num_axes; ++axis) {
             if (selected(axis)) {
-                cmd += axisNumToChar(axis);
-                cmd += e4_to_cstr(delta * distance(axis) * band_mult, inInches ? 3 : 2);
+                cmdStr += axisNumToChar(axis);
+                cmdStr += e4_to_cstr(delta * step_size, 3);
             }
         }
-        send_line(cmd.c_str());
+        send_line(cmdStr.c_str());
     }
     void start_button_jog(bool negative) {
-        // e.g. $J=G91F1000X-10000
-        e4_t total_distance = 0;
-        int  n_axes         = 0;
-        for (int axis = 0; axis < num_axes; ++axis) {
-            if (selected(axis)) {
-                total_distance = e4_magnitude(total_distance, distance(axis));
-                ++n_axes;
-            }
+        int band_mult = get_band_multiplier();
+        if (band_mult == 0) return;  // Jog locked
+
+        // Band switch controls feedrate for continuous jog
+        // Capped at 350 for Z safety (your Z max is 400)
+        int feedrate;
+        if (band_mult == 1) {
+            feedrate = 100;   // Slow/precise
+        } else if (band_mult == 10) {
+            feedrate = 350;   // Medium
+        } else {
+            feedrate = 350;   // Fast (capped for Z safety)
         }
 
-        e4_t feedrate = total_distance * 100;  // Reduced from 300 to prevent buffer overflow
+        // Distance just needs to be large enough that it won't stop
+        // before you release the button - jog gets cancelled on release
+        e4_t travel_distance = e4_from_int(100);  // 100mm max travel per press
 
-        std::string cmd("$J=G91");
-        cmd += inInches ? "G20" : "G21";
-        cmd += "F";
-        cmd += e4_to_cstr(feedrate, 3);
+        char cmd[64];
+        snprintf(cmd, sizeof(cmd), "$J=G91G21F%d", feedrate);
+        std::string cmdStr(cmd);
+
         for (int axis = 0; axis < num_axes; ++axis) {
             if (selected(axis)) {
-                e4_t axis_distance;
-                if (n_axes == 1) {
-                    // Reduced from 200/5000 to prevent runaway jogging
-                    axis_distance = e4_from_int(inInches ? 50 : 1000);
-                } else {
-                    // Reduced multiplier from 20 to 5
-                    axis_distance = distance(axis) * 5;
-                }
+                e4_t axis_distance = travel_distance;
                 if (negative) {
                     axis_distance = -axis_distance;
                 }
-                cmd += axisNumToChar(axis);
-                cmd += e4_to_cstr(axis_distance, 0);
+                cmdStr += axisNumToChar(axis);
+                cmdStr += e4_to_cstr(axis_distance, 0);
             }
         }
-        send_line(cmd.c_str());
+        send_line(cmdStr.c_str());
         _continuous = true;
     }
 
