@@ -300,7 +300,8 @@ public:
 
     void start_mpg_jog(int delta) {
         // e.g. $J=G91F1000X-10000
-        std::string cmd(inInches ? "$J=G91F400" : "$J=G91F10000");
+        // Reduced speed to prevent buffer overflow (was F400/F10000)
+        std::string cmd(inInches ? "$J=G91F100" : "$J=G91F2000");
         for (int axis = 0; axis < num_axes; ++axis) {
             if (selected(axis)) {
                 cmd += axisNumToChar(axis);
@@ -320,7 +321,7 @@ public:
             }
         }
 
-        e4_t feedrate = total_distance * 300;  // go 5x the highlighted distance in 1 second
+        e4_t feedrate = total_distance * 100;  // Reduced from 300 to prevent buffer overflow
 
         std::string cmd("$J=G91");
         cmd += inInches ? "G20" : "G21";
@@ -330,9 +331,11 @@ public:
             if (selected(axis)) {
                 e4_t axis_distance;
                 if (n_axes == 1) {
-                    axis_distance = e4_from_int(inInches ? 200 : 5000);
+                    // Reduced from 200/5000 to prevent runaway jogging
+                    axis_distance = e4_from_int(inInches ? 50 : 1000);
                 } else {
-                    axis_distance = distance(axis) * 20;
+                    // Reduced multiplier from 20 to 5
+                    axis_distance = distance(axis) * 5;
                 }
                 if (negative) {
                     axis_distance = -axis_distance;
