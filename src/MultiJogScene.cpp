@@ -62,6 +62,17 @@ public:
         drawMenuTitle(current_scene->name());
         drawStatus();
 
+#ifdef PIBOT_PENDANT
+        // Display band switch multiplier
+        int band = get_band_multiplier();
+        char band_str[8];
+        snprintf(band_str, sizeof(band_str), "x%d", band);
+        display.setTextDatum(top_right);
+        display.setTextColor(band == 1 ? LIGHTGREY : (band == 10 ? YELLOW : GREEN));
+        display.drawString(band_str, 235, 5);
+        display.setTextDatum(top_left);  // Reset to default
+#endif
+
         if (state != Jog && _cancelling) {
             _cancelling = false;
         }
@@ -301,11 +312,12 @@ public:
     void start_mpg_jog(int delta) {
         // e.g. $J=G91F1000X-10000
         // Reduced speed to prevent buffer overflow (was F400/F10000)
+        int band_mult = get_band_multiplier();
         std::string cmd(inInches ? "$J=G91F100" : "$J=G91F2000");
         for (int axis = 0; axis < num_axes; ++axis) {
             if (selected(axis)) {
                 cmd += axisNumToChar(axis);
-                cmd += e4_to_cstr(delta * distance(axis), inInches ? 3 : 2);
+                cmd += e4_to_cstr(delta * distance(axis) * band_mult, inInches ? 3 : 2);
             }
         }
         send_line(cmd.c_str());

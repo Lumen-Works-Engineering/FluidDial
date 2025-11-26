@@ -654,3 +654,17 @@ void update_events() {
 void ackBeep() {}
 
 void deep_sleep(int us) {}
+
+#ifdef PIBOT_PENDANT
+int get_band_multiplier() {
+    // Band switch pins have 10k pull-ups, LOW when switch grounds them
+    if (digitalRead(GPIO_NUM_34) == LOW) return 1;    // Position 1: ×1
+    if (digitalRead(GPIO_NUM_35) == LOW) return 10;   // Position 2: ×10
+    if (digitalRead(GPIO_NUM_39) == LOW) return 100;  // Position 3: ×100
+    return 1;  // Default if no position detected
+}
+#else
+int get_band_multiplier() {
+    return 1;  // Non-PiBot hardware: no band switch
+}
+#endif
