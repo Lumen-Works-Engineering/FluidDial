@@ -23,7 +23,11 @@
 // CYD that is supposed to control battery charging, cutting the
 // traces that connect it to the battery circuit and running a wire
 // over to the photoresistor.
+#ifdef PIBOT_PENDANT
+int lockout_pin = -1;  // PiBot uses GPIO34 for band switch, not lockout
+#else
 int lockout_pin = GPIO_NUM_34;
+#endif
 
 m5::Touch_Class  xtouch;
 m5::Touch_Class& touch = xtouch;
@@ -122,6 +126,9 @@ static void init_panel_st7789() {
     cfg.pin_cs          = GPIO_NUM_15;
     cfg.offset_rotation = base_rotation;
     cfg.bus_shared      = false;
+#ifdef PIBOT_PENDANT
+    cfg.invert          = true;  // PiBot Pendant V4 requires display inversion
+#endif
     p.config(cfg);
 
     p.light(&light);
@@ -181,10 +188,10 @@ void init_capacitive_cyd() {
         cfg.pin_rst         = -1;
         cfg.offset_rotation = base_rotation;
         cfg.freq            = 400000;
-        cfg.x_min           = 239;           // PiBot inverted X
-        cfg.x_max           = 0;
-        cfg.y_min           = 319;           // PiBot inverted Y
-        cfg.y_max           = 0;
+        cfg.x_min           = 0;
+        cfg.x_max           = 239;
+        cfg.y_min           = 0;
+        cfg.y_max           = 319;
         cfg.bus_shared      = false;
         _touch_ft5x06.config(cfg);
         display.getPanel()->setTouch(&_touch_ft5x06);
@@ -205,17 +212,17 @@ void init_capacitive_cyd() {
 #endif
         display.getPanel()->initTouch();
     }
-    #ifdef PIBOT_PENDANT
-    // GPIO21 used by UART in some configs
-    // Skip software backlight control - hardware handles it
-    #else
-    setBacklightPin(GPIO_NUM_27);
-    #endif
+    setBacklightPin(GPIO_NUM_21);
+
     pinMode(lockout_pin, INPUT);
 
 #    ifdef CYD_BUTTONS
     enc_a = GPIO_NUM_22;
-    enc_b = GPIO_NUM_21;
+#        ifdef PIBOT_PENDANT
+    enc_b = GPIO_NUM_27;  // PiBot encoder B
+#        else
+    enc_b = GPIO_NUM_21;  // Standard CYD encoder B
+#        endif
     // rotary_button_pin = GPIO_NUM_35;
     // pinMode(rotary_button_pin, INPUT);  // Pullup does not work on GPIO35
 #        ifdef PIBOT_PENDANT
@@ -509,8 +516,6 @@ void init_hardware() {
 int last_locked = -1;
 
 void redrawButtons() {
-#ifndef PIBOT_PENDANT
-    // Only draw for non-PiBot hardware
     display.startWrite();
     for (int i = 0; i < n_buttons; i++) {
         Point position = layout->buttonsXY + layout->buttonOffset(i);
@@ -519,7 +524,6 @@ void redrawButtons() {
         sprite.pushSprite(position.x, position.y);
     }
     display.endWrite();
-#endif
 }
 
 void show_logo() {
@@ -529,11 +533,10 @@ void show_logo() {
 }
 
 void base_display() {
-#ifndef PIBOT_PENDANT
-    initButtons();  // Skip sprite creation for PiBot
-#endif
+    initButtons();
     redrawButtons();
 }
+
 void next_layout(int delta) {
     layout_num += delta;
     while (layout_num >= num_layouts) {
