@@ -139,6 +139,10 @@ static void init_panel_ili9341() {
     cfg.pin_cs          = GPIO_NUM_15;
     cfg.offset_rotation = base_rotation;
     cfg.bus_shared      = false;
+#ifdef PIBOT_PENDANT
+    cfg.invert          = true;  // PiBot Pendant V4 requires display inversion
+#endif
+ 
     p.config(cfg);
 
     p.light(&light);
@@ -157,10 +161,35 @@ int green_button_pin = -1;
 int enc_a, enc_b;
 
 #ifdef CAPACITIVE_CYD
+#ifdef PIBOT_PENDANT
+// PiBot Pendant V4 uses FT5x06 capacitive touch controller
+lgfx::Touch_FT5x06 _touch_ft5x06;
+#else
+// Standard CYD uses CST816S touch controller
 lgfx::Touch_CST816S _touch_cst816s;
+#endif
 
 void init_capacitive_cyd() {
     {
+#ifdef PIBOT_PENDANT
+        // PiBot Pendant V4 FT5x06 touch configuration
+        auto cfg            = _touch_ft5x06.config();
+        cfg.i2c_port        = I2C_NUM_1;     // PiBot uses I2C_NUM_1
+        cfg.pin_sda         = GPIO_NUM_32;   // PiBot SDA
+        cfg.pin_scl         = GPIO_NUM_25;   // PiBot SCL
+        cfg.pin_int         = GPIO_NUM_36;   // PiBot INT
+        cfg.pin_rst         = -1;
+        cfg.offset_rotation = base_rotation;
+        cfg.freq            = 400000;
+        cfg.x_min           = 239;           // PiBot inverted X
+        cfg.x_max           = 0;
+        cfg.y_min           = 319;           // PiBot inverted Y
+        cfg.y_max           = 0;
+        cfg.bus_shared      = false;
+        _touch_ft5x06.config(cfg);
+        display.getPanel()->setTouch(&_touch_ft5x06);
+#else
+        // Standard CYD CST816S touch configuration
         auto cfg            = _touch_cst816s.config();
         cfg.i2c_port        = I2C_NUM_0;
         cfg.pin_sda         = GPIO_NUM_33;
@@ -173,10 +202,15 @@ void init_capacitive_cyd() {
         cfg.y_max           = 320;
         _touch_cst816s.config(cfg);
         display.getPanel()->setTouch(&_touch_cst816s);
+#endif
         display.getPanel()->initTouch();
     }
+    #ifdef PIBOT_PENDANT
+    // GPIO21 used by UART in some configs
+    // Skip software backlight control - hardware handles it
+    #else
     setBacklightPin(GPIO_NUM_27);
-
+    #endif
     pinMode(lockout_pin, INPUT);
 
 #    ifdef CYD_BUTTONS
@@ -184,10 +218,21 @@ void init_capacitive_cyd() {
     enc_b = GPIO_NUM_21;
     // rotary_button_pin = GPIO_NUM_35;
     // pinMode(rotary_button_pin, INPUT);  // Pullup does not work on GPIO35
-
+#        ifdef PIBOT_PENDANT
+    // PiBot Pendant V4 has swapped dial and green button pins
+    red_button_pin   = GPIO_NUM_4;   // RGB LED Red
+    dial_button_pin  = GPIO_NUM_16;  // RGB LED Blue (PiBot uses GPIO 16)
+    green_button_pin = GPIO_NUM_17;  // RGB LED Green (PiBot uses GPIO 17)
+    // Initialize band switch pins to prevent floating
+    pinMode(GPIO_NUM_34, INPUT);  // Band position 1 (×1)
+    pinMode(GPIO_NUM_35, INPUT);  // Band position 2 (×10)
+    pinMode(GPIO_NUM_39, INPUT);  // Band position 3 (×100)
+#        else
+    // Standard CYD button mapping
     red_button_pin   = GPIO_NUM_4;   // RGB LED Red
     dial_button_pin  = GPIO_NUM_17;  // RGB LED Blue
     green_button_pin = GPIO_NUM_16;  // RGB LED Green
+#        endif
     pinMode(red_button_pin, INPUT_PULLUP);
     pinMode(dial_button_pin, INPUT_PULLUP);
     pinMode(green_button_pin, INPUT_PULLUP);
@@ -464,6 +509,8 @@ void init_hardware() {
 int last_locked = -1;
 
 void redrawButtons() {
+#ifndef PIBOT_PENDANT
+    // Only draw for non-PiBot hardware
     display.startWrite();
     for (int i = 0; i < n_buttons; i++) {
         Point position = layout->buttonsXY + layout->buttonOffset(i);
@@ -472,6 +519,7 @@ void redrawButtons() {
         sprite.pushSprite(position.x, position.y);
     }
     display.endWrite();
+#endif
 }
 
 void show_logo() {
@@ -481,7 +529,9 @@ void show_logo() {
 }
 
 void base_display() {
-    initButtons();
+#ifndef PIBOT_PENDANT
+    initButtons();  // Skip sprite creation for PiBot
+#endif
     redrawButtons();
 }
 void next_layout(int delta) {
