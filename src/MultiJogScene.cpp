@@ -62,31 +62,6 @@ public:
         drawMenuTitle(current_scene->name());
         drawStatus();
 
-#ifdef PIBOT_PENDANT
-        // Display band switch multiplier
-        int band = get_band_multiplier();
-        const char* band_str;
-        int color;
-        if (band == 0) {
-            band_str = "LOCK";
-            color = RED;
-        } else if (band == 1) {
-            band_str = "x1";
-            color = LIGHTGREY;
-        } else if (band == 10) {
-            band_str = "x10";
-            color = YELLOW;
-        } else {
-            band_str = "x100";
-            color = GREEN;
-        }
-        display.setFont(&fonts::FreeSansBold9pt7b);
-        display.setTextDatum(top_right);
-        display.setTextColor(color, BLACK);  // Second param is background - prevents flicker
-        display.drawString(band_str, 235, 5);
-        display.setTextDatum(top_left);
-#endif
-
         if (state != Jog && _cancelling) {
             _cancelling = false;
         }
@@ -111,6 +86,29 @@ public:
                 drawButtonLegends("Jog-", "Jog+", dialLegend.c_str());
             }
         }
+#ifdef PIBOT_PENDANT
+        // Display band switch multiplier (draw last to avoid overdraw)
+        int band = get_band_multiplier();
+        const char* band_str;
+        int color;
+        if (band == 0) {
+            band_str = "LOCK";
+            color = RED;
+        } else if (band == 1) {
+            band_str = "x1";
+            color = LIGHTGREY;
+        } else if (band == 10) {
+            band_str = "x10";
+            color = YELLOW;
+        } else {
+            band_str = "x100";
+            color = GREEN;
+        }
+        canvas.setFont(&fonts::FreeSansBold9pt7b);
+        canvas.setTextDatum(top_right);
+        canvas.setTextColor(color, BLACK);
+        canvas.drawString(band_str, 230, 8);
+#endif
         refreshDisplay();
     }
     void zero_axes() {
@@ -324,23 +322,25 @@ public:
     }
 
     void start_mpg_jog(int delta) {
+        // Cancel any active jog to prevent command pileup
+        fnc_realtime(JogCancel);
+
         int band_mult = get_band_multiplier();
         if (band_mult == 0) return;  // Jog locked
 
-        // Band switch sets step size directly:
-        // x1 = 0.01mm, x10 = 0.1mm, x100 = 1.0mm per encoder click
-        // Feedrates kept conservative for Z axis (max 400 mm/min)
+        // Higher feedrates now that we prevent pileup
+        // Still under your X/Y max of 2000, Z will auto-clamp to 400
         e4_t step_size;
         int feedrate;
         if (band_mult == 1) {
             step_size = 100;      // Fine: 0.01mm
-            feedrate = 200;
+            feedrate = 600;
         } else if (band_mult == 10) {
             step_size = 1000;     // Medium: 0.1mm
-            feedrate = 350;
+            feedrate = 1200;
         } else {
             step_size = 10000;    // Coarse: 1.0mm
-            feedrate = 350;       // Keep Z-safe
+            feedrate = 1800;
         }
 
         char cmd[64];
