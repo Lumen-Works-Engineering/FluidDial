@@ -322,31 +322,26 @@ public:
     }
 
     void start_mpg_jog(int delta) {
-        // Cancel any active jog to prevent command pileup
-        fnc_realtime(JogCancel);
-
         int band_mult = get_band_multiplier();
-        if (band_mult == 0) return;  // Jog locked
-
-        // Higher feedrates now that we prevent pileup
-        // Still under your X/Y max of 2000, Z will auto-clamp to 400
+        if (band_mult == 0) return;  // Jog locked (off position)
+        
         e4_t step_size;
         int feedrate;
         if (band_mult == 1) {
-            step_size = 100;      // Fine: 0.01mm
+            step_size = e4_power10(-2);  // 0.01mm
             feedrate = 600;
         } else if (band_mult == 10) {
-            step_size = 1000;     // Medium: 0.1mm
+            step_size = e4_power10(-1);  // 0.1mm
             feedrate = 1200;
         } else {
-            step_size = 10000;    // Coarse: 1.0mm
+            step_size = e4_power10(0);   // 1.0mm
             feedrate = 1800;
         }
-
+        
         char cmd[64];
         snprintf(cmd, sizeof(cmd), "$J=G91F%d", feedrate);
         std::string cmdStr(cmd);
-
+        
         for (int axis = 0; axis < num_axes; ++axis) {
             if (selected(axis)) {
                 cmdStr += axisNumToChar(axis);
@@ -355,6 +350,7 @@ public:
         }
         send_line(cmdStr.c_str());
     }
+    
     void start_button_jog(bool negative) {
         int band_mult = get_band_multiplier();
         if (band_mult == 0) return;  // Jog locked
