@@ -354,26 +354,16 @@ public:
     void start_button_jog(bool negative) {
         int band_mult = get_band_multiplier();
         if (band_mult == 0) return;  // Jog locked
-
-        // Band switch controls feedrate for continuous jog
-        // Capped at 350 for Z safety (your Z max is 400)
-        int feedrate;
-        if (band_mult == 1) {
-            feedrate = 100;   // Slow/precise
-        } else if (band_mult == 10) {
-            feedrate = 350;   // Medium
-        } else {
-            feedrate = 350;   // Fast (capped for Z safety)
-        }
-
-        // Distance just needs to be large enough that it won't stop
-        // before you release the button - jog gets cancelled on release
-        e4_t travel_distance = e4_from_int(100);  // 100mm max travel per press
-
+        
+        // POT controls feedrate (50-1800 range, Z auto-clamps to 400)
+        int feedrate = get_pot_feedrate(50, 1800);
+        
+        e4_t travel_distance = e4_from_int(100);
+        
         char cmd[64];
         snprintf(cmd, sizeof(cmd), "$J=G91G21F%d", feedrate);
         std::string cmdStr(cmd);
-
+        
         for (int axis = 0; axis < num_axes; ++axis) {
             if (selected(axis)) {
                 e4_t axis_distance = travel_distance;

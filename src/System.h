@@ -80,3 +80,4 @@ void next_layout(int delta);
 
 bool ui_locked();
 int get_band_multiplier();
+int get_pot_feedrate(int min_rate, int max_rate);

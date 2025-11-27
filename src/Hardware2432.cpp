@@ -669,3 +669,14 @@ int get_band_multiplier() {
     return 1;  // Non-PiBot hardware: no band switch
 }
 #endif
+
+#ifdef PIBOT_PENDANT
+int get_pot_feedrate(int min_rate, int max_rate) {
+    int pot_value = analogRead(GPIO_NUM_33);  // 0-4095
+    return map(pot_value, 0, 4095, min_rate, max_rate);
+}
+#else
+int get_pot_feedrate(int min_rate, int max_rate) {
+    return max_rate;
+}
+#endif
