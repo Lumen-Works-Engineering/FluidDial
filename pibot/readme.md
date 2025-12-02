@@ -1,4 +1,4 @@
-The file fluiddial-1000000-for-rj12.bin is all that PiBot provides for their cnc pendant with fluiddial. No source code except as listed below.
+Compiled bin files is all that PiBot provides for their cnc pendant with fluiddial. No source code.
 The file LGFX_AutoDetect_ESP32_all.hpp was obtained from the PiBot CNC Pendant developer. He stated he's not much of a developer and doesn't know how to use git.  He said this was the file he changed the most for fluiddial to work with the pibot cnc pendant.
 These are the changes he said he made.
 in line 3102-3116
