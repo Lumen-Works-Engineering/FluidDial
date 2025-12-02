@@ -22,11 +22,11 @@ static const char* jog_help_text[] = { "Jog Help",
 
 class MultiJogScene : public Scene {
 private:
-    int          _dist_index[3] = { 2, 2, 2 };
+    int          _dist_index[MAX_AXES] = { 2, 2, 2, 2, 2, 2 };
     int          max_index() { return 6; }  // 10^3 = 1000;
     int          min_index() { return 0; }  // 10^3 = 1000;
     int          _selected_mask = 1 << 0;
-    const int    num_axes       = 3;
+    int          num_axes() { return n_axes; }  // Dynamic axis count from FluidNC
     bool         _cancelling    = false;
     bool         _cancel_held   = false;
     bool         _continuous    = false;
@@ -48,7 +48,7 @@ public:
         if ((_selected_mask & (_selected_mask - 1)) != 0) {
             return -2;  // Multiple axes are selected
         }
-        for (size_t axis = 0; axis < num_axes; axis++) {
+        for (int axis = 0; axis < num_axes(); axis++) {
             if (selected(axis)) {
                 return axis;
             }
@@ -68,8 +68,11 @@ public:
         if (_cancelling || _cancel_held) {
             centered_text("Jog Canceled", 120, RED, MEDIUM);
         } else {
-            DRO dro(16, 68, 210, 32);
-            for (size_t axis = 0; axis < num_axes; axis++) {
+            // Calculate DRO row height based on axis count
+            int dro_height = (num_axes() <= 3) ? 32 : (num_axes() <= 4) ? 28 : 24;
+            int dro_start_y = (num_axes() <= 3) ? 68 : (num_axes() <= 4) ? 64 : 58;
+            DRO dro(16, dro_start_y, 210, dro_height);
+            for (int axis = 0; axis < num_axes(); axis++) {
                 dro.draw(axis, _dist_index[axis], selected(axis));
             }
             if (state == Jog) {
@@ -78,7 +81,7 @@ public:
                 }
             } else {
                 std::string dialLegend("Zero");
-                for (int axis = 0; axis < num_axes; axis++) {
+                for (int axis = 0; axis < num_axes(); axis++) {
                     if (selected(axis)) {
                         dialLegend += axisNumToChar(axis);
                     }
@@ -113,7 +116,7 @@ public:
     }
     void zero_axes() {
         std::string cmd = "G10L20P0";
-        for (int axis = 0; axis < num_axes; axis++) {
+        for (int axis = 0; axis < num_axes(); axis++) {
             if (selected(axis)) {
                 cmd += axisNumToChar(axis);
                 cmd += "0";
@@ -127,23 +130,28 @@ public:
         }
         if (initPrefs()) {
             _bg_image = createPngBackground("/jogbg.png");
-            for (size_t axis = 0; axis < 3; axis++) {
+            for (int axis = 0; axis < MAX_AXES; axis++) {
                 getPref("DistanceDigit", axis, &_dist_index[axis]);
             }
         }
     }
 
     int which(int x, int y) {
-        if (y > 130) {
-            return 2;
-        }
-        return y > 90 ? 1 : 0;
+        // Determine which axis row was touched based on y coordinate
+        // DRO starts at varying y based on axis count, rows have varying height
+        int dro_height = (num_axes() <= 3) ? 32 : (num_axes() <= 4) ? 28 : 24;
+        int dro_start_y = (num_axes() <= 3) ? 68 : (num_axes() <= 4) ? 64 : 58;
+        
+        int axis = (y - dro_start_y) / dro_height;
+        if (axis < 0) axis = 0;
+        if (axis >= num_axes()) axis = num_axes() - 1;
+        return axis;
     }
 
     void confirm_zero_axes() {
         std::string confirmMsg("Zero ");
 
-        for (int axis = 0; axis < num_axes; axis++) {
+        for (int axis = 0; axis < num_axes(); axis++) {
             if (selected(axis)) {
                 confirmMsg += axisNumToChar(axis);
             }
@@ -163,7 +171,7 @@ public:
         }
     }
     void increment_distance() {
-        for (int axis = 0; axis < num_axes; axis++) {
+        for (int axis = 0; axis < num_axes(); axis++) {
             if (selected(axis)) {
                 increment_distance(axis);
             }
@@ -176,14 +184,14 @@ public:
     }
 
     void decrement_distance() {
-        for (int axis = 0; axis < num_axes; axis++) {
+        for (int axis = 0; axis < num_axes(); axis++) {
             if (selected(axis)) {
                 decrement_distance(axis);
             }
         }
     }
     void rotate_distance() {
-        for (int axis = 0; axis < num_axes; axis++) {
+        for (int axis = 0; axis < num_axes(); axis++) {
             if (selected(axis)) {
                 if (++_dist_index[axis] >= max_index()) {
                     _dist_index[axis] = min_index();
@@ -202,15 +210,15 @@ public:
         int the_axis = the_selected_axis();
         if (the_axis == -2) {
             unselect_all();
-            select(num_axes - 1);
+            select(num_axes() - 1);
             return;
         }
         if (the_axis == -1) {
-            select(num_axes - 1);
+            select(num_axes() - 1);
             return;
         }
         unselect(the_axis);
-        if (++the_axis == num_axes) {
+        if (++the_axis == num_axes()) {
             the_axis = 0;
         }
         select(the_axis);
@@ -228,7 +236,7 @@ public:
         }
         unselect(the_axis);
         if (--the_axis < 0) {
-            the_axis = num_axes - 1;
+            the_axis = num_axes() - 1;
         }
         select(the_axis);
     }
@@ -342,7 +350,7 @@ public:
         snprintf(cmd, sizeof(cmd), "$J=G91F%d", feedrate);
         std::string cmdStr(cmd);
         
-        for (int axis = 0; axis < num_axes; ++axis) {
+        for (int axis = 0; axis < num_axes(); ++axis) {
             if (selected(axis)) {
                 cmdStr += axisNumToChar(axis);
                 cmdStr += e4_to_cstr(delta * step_size, 3);
@@ -364,7 +372,7 @@ public:
         snprintf(cmd, sizeof(cmd), "$J=G91G21F%d", feedrate);
         std::string cmdStr(cmd);
         
-        for (int axis = 0; axis < num_axes; ++axis) {
+        for (int axis = 0; axis < num_axes(); ++axis) {
             if (selected(axis)) {
                 e4_t axis_distance = travel_distance;
                 if (negative) {

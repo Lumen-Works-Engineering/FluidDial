@@ -4,6 +4,9 @@
 #pragma once
 #include "GrblParserC.h"
 
+// Maximum number of axes supported by FluidNC (X, Y, Z, A, B, C)
+#define MAX_AXES 6
+
 // Same states as FluidNC except for the last one
 enum state_t {
     Idle = 0,   // Must be zero.
@@ -28,8 +31,8 @@ extern state_t     previous_state;
 extern const char* my_state_string;
 
 extern int                n_axes;
-extern pos_t              myAxes[6];
-extern bool               myLimitSwitches[6];
+extern pos_t              myAxes[MAX_AXES];
+extern bool               myLimitSwitches[MAX_AXES];
 extern bool               myProbeSwitch;
 extern const char*        myCtrlPins;
 extern const char*        myFile;

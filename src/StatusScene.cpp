@@ -134,10 +134,13 @@ public:
         drawMenuTitle(current_scene->name());
         drawStatus();
 
-        DRO dro(16, 68, 210, 32);
-        dro.draw(0, -1, true);
-        dro.draw(1, -1, true);
-        dro.draw(2, -1, true);
+        // Calculate DRO row height based on axis count
+        int dro_height = (n_axes <= 3) ? 32 : (n_axes <= 4) ? 28 : 24;
+        int dro_start_y = (n_axes <= 3) ? 68 : (n_axes <= 4) ? 64 : 58;
+        DRO dro(16, dro_start_y, 210, dro_height);
+        for (int axis = 0; axis < n_axes; axis++) {
+            dro.draw(axis, -1, true);
+        }
 
         int y = 170;
         if (state == Cycle || state == Hold) {

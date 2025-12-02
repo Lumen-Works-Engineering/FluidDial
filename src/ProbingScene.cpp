@@ -90,7 +90,7 @@ public:
                     setPref("Retract", _retract);
                     break;
                 case 4:
-                    rotateNumberLoop(_axis, 1, 0, 2);
+                    rotateNumberLoop(_axis, 1, 0, n_axes - 1);
                     setPref("Axis", _axis);
             }
             reDisplay();
@@ -150,10 +150,12 @@ public:
                 led.draw(myProbeSwitch);
 
                 int width = display_short_side() - x * 2;
-                DRO dro(x, y, width, height);
-                dro.draw(0, _axis == 0);
-                dro.draw(1, _axis == 1);
-                dro.draw(2, _axis == 2);
+                // Calculate DRO row height based on axis count
+                int dro_height = (n_axes <= 3) ? height : (n_axes <= 4) ? 28 : 24;
+                DRO dro(x, y, width, dro_height);
+                for (int axis = 0; axis < n_axes; axis++) {
+                    dro.draw(axis, _axis == axis);
+                }
 
                 switch (state) {
                     case Cycle:

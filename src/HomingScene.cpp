@@ -6,17 +6,22 @@
 
 extern Scene statusScene;
 
-#define HOMING_N_AXIS 3
-
-IntConfigItem homing_cycles[HOMING_N_AXIS] = {
+// Use MAX_AXES from FluidNCModel.h for consistency
+IntConfigItem homing_cycles[MAX_AXES] = {
     { "$/axes/x/homing/cycle" },
     { "$/axes/y/homing/cycle" },
     { "$/axes/z/homing/cycle" },
+    { "$/axes/a/homing/cycle" },
+    { "$/axes/b/homing/cycle" },
+    { "$/axes/c/homing/cycle" },
 };
-BoolConfigItem homing_allows[HOMING_N_AXIS] = {
+BoolConfigItem homing_allows[MAX_AXES] = {
     { "$/axes/x/homing/allow_single_axis" },
     { "$/axes/y/homing/allow_single_axis" },
     { "$/axes/z/homing/allow_single_axis" },
+    { "$/axes/a/homing/allow_single_axis" },
+    { "$/axes/b/homing/allow_single_axis" },
+    { "$/axes/c/homing/allow_single_axis" },
 };
 
 int  homed_axes = 0;
@@ -29,7 +34,8 @@ void set_axis_homed(int axis) {
 }
 
 void detect_homing_info() {
-    for (int i = 0; i < HOMING_N_AXIS; i++) {
+    // Initialize homing info for all axes that FluidNC reports
+    for (int i = 0; i < n_axes; i++) {
         homing_cycles[i].init();
         homing_allows[i].init();
     }
@@ -37,11 +43,14 @@ void detect_homing_info() {
 }
 bool can_home(int i) {
     // Cannot home if cycle == 0 and !allow_single_axis
+    // Also can't home axes beyond what FluidNC reports
+    if (i >= n_axes) return false;
     return homing_cycles[i].get() != 0 || homing_allows[i].get();
 }
 
 bool have_homing_info() {
-    return homing_allows[HOMING_N_AXIS - 1].known();
+    // Check if we have info for the last configured axis
+    return n_axes > 0 && homing_allows[n_axes - 1].known();
 }
 
 class HomingScene : public Scene {
@@ -49,7 +58,7 @@ private:
     int _axis_to_home = -1;
     int _auto         = false;
 
-    bool _allows[HOMING_N_AXIS];
+    bool _allows[MAX_AXES];
 
 public:
     HomingScene() : Scene("Home", 4) {}
@@ -93,7 +102,7 @@ public:
     void increment_axis_to_home() {
         do {
             ++_axis_to_home;
-            if (_axis_to_home > HOMING_N_AXIS) {
+            if (_axis_to_home > n_axes) {
                 _axis_to_home = -1;
                 return;
             }
@@ -124,14 +133,20 @@ public:
         std::string green       = "Home ";
 
         if (false && state == Homing) {
-            DRO dro(16, 68, 210, 32);
-            for (size_t axis = 0; axis < HOMING_N_AXIS; axis++) {
+            // Calculate DRO row height based on axis count
+            int dro_height = (n_axes <= 3) ? 32 : (n_axes <= 4) ? 28 : 24;
+            int dro_start_y = (n_axes <= 3) ? 68 : (n_axes <= 4) ? 64 : 58;
+            DRO dro(16, dro_start_y, 210, dro_height);
+            for (int axis = 0; axis < n_axes; axis++) {
                 dro.draw(axis, -1, true);
             }
 
         } else if (state == Idle || state == Homing || state == Alarm) {
-            DRO dro(16, 68, 210, 32);
-            for (int axis = 0; axis < HOMING_N_AXIS; ++axis) {
+            // Calculate DRO row height based on axis count
+            int dro_height = (n_axes <= 3) ? 32 : (n_axes <= 4) ? 28 : 24;
+            int dro_start_y = (n_axes <= 3) ? 68 : (n_axes <= 4) ? 64 : 58;
+            DRO dro(16, dro_start_y, 210, dro_height);
+            for (int axis = 0; axis < n_axes; ++axis) {
                 dro.drawHoming(axis, is_homing(axis), is_homed(axis));
             }
 
@@ -160,7 +175,7 @@ public:
                     redLabel = "Reset";
                 }
                 if (_axis_to_home == -1) {
-                    for (int axis = 0; axis < HOMING_N_AXIS; ++axis) {
+                    for (int axis = 0; axis < n_axes; ++axis) {
                         if (can_home(axis)) {
                             if (!grnLabel.length()) {
                                 grnLabel = "Home";

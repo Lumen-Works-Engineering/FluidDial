@@ -16,8 +16,8 @@ extern Scene statusScene;
 const char*        my_state_string    = "N/C";
 state_t            state              = Idle;
 int                n_axes             = 3;
-pos_t              myAxes[6]          = { 0 };
-bool               myLimitSwitches[6] = { false };
+pos_t              myAxes[MAX_AXES]          = { 0 };
+bool               myLimitSwitches[MAX_AXES] = { false };
 bool               myProbeSwitch      = false;
 const char*        myFile             = "";  // running SD filename
 const char*        myCtrlPins         = "";
